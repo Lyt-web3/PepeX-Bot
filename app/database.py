@@ -29,6 +29,19 @@ def set_linked_wallet(discord_id, wallet):
         conn.commit()
 
 
+def create_linked_wallet(discord_id, wallet):
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute(
+            """
+            INSERT OR IGNORE INTO linked_wallets(discord_id, wallet)
+            VALUES(?, ?)
+            """,
+            (discord_id, wallet),
+        )
+        conn.commit()
+    return cursor.rowcount == 1
+
+
 def get_linked_wallet(discord_id):
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(

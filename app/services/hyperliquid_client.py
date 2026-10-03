@@ -6,9 +6,10 @@ from typing import Any, Dict
 import requests
 
 from app.config import API_BACKOFF_SECONDS, API_RETRY_ATTEMPTS, HTTP_TIMEOUT_SECONDS, HL_URL, logger
-from app.exceptions import HyperliquidAPIError
+from app.exceptions import HyperliquidAPIError, WalletNotAssociatedError
 
 DEX_CACHE: Dict[str, str] = {}
+WALLET_NOT_ASSOCIATED_MESSAGE = "THIS ADDRESS IS NOT ASSOCIATED WITH HYPERLIQUID"
 
 
 def hl(payload: Dict[str, Any], retries: int = API_RETRY_ATTEMPTS):
@@ -32,6 +33,16 @@ def hl(payload: Dict[str, Any], retries: int = API_RETRY_ATTEMPTS):
 
 async def ask(payload: Dict[str, Any]):
     return await asyncio.to_thread(hl, payload)
+
+
+async def ensure_hyperliquid_wallet(wallet: str):
+    role = await ask({"type": "userRole", "user": wallet})
+    if isinstance(role, dict):
+        role = role.get("role")
+    if isinstance(role, str) and role.lower() == "missing":
+        raise WalletNotAssociatedError(WALLET_NOT_ASSOCIATED_MESSAGE)
+    if role is None:
+        raise HyperliquidAPIError("Hyperliquid returned an invalid wallet role response.")
 
 
 async def resolve_dex(market: str):

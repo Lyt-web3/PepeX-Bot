@@ -15,7 +15,7 @@ from app.services.card_service import (
     demo_position_for_market,
     demo_volume_for_market,
 )
-from app.services.hyperliquid_client import ask, resolve_dex
+from app.services.hyperliquid_client import ask, ensure_hyperliquid_wallet, resolve_dex
 from app.services.wallet_service import (
     fetch_fills,
     pick_position,
@@ -58,6 +58,7 @@ async def pnl_card(interaction: discord.Interaction, wallet: Optional[str] = Non
         if wallet.lower() == "demo":
             args = demo_position_for_market(market)
         else:
+            await ensure_hyperliquid_wallet(wallet)
             dex = await resolve_dex(market)
             state = await ask(state_payload(wallet, dex))
             pos = pick_position(state, coin)
@@ -70,7 +71,8 @@ async def pnl_card(interaction: discord.Interaction, wallet: Optional[str] = Non
             args = position_card_args(pos)
 
         await interaction.followup.send(
-            file=render_card(
+            file=await asyncio.to_thread(
+                render_card,
                 card.make_card,
                 "pnl.png",
                 "ENTROPY" if market == "entropy" else "",
@@ -99,12 +101,14 @@ async def portfolio_card(interaction: discord.Interaction, wallet: Optional[str]
         if wallet.lower() == "demo":
             args = demo_portfolio_for_market(market)
         else:
+            await ensure_hyperliquid_wallet(wallet)
             dex = await resolve_dex(market)
             state = await ask(state_payload(wallet, dex))
             args = portfolio_card_args(state)
 
         await interaction.followup.send(
-            file=render_card(
+            file=await asyncio.to_thread(
+                render_card,
                 card.make_portfolio_card,
                 "portfolio.png",
                 "ENTROPY" if market == "entropy" else "",
@@ -133,13 +137,15 @@ async def volume_card(interaction: discord.Interaction, wallet: Optional[str] = 
         if wallet.lower() == "demo":
             args = demo_volume_for_market(market)
         else:
+            await ensure_hyperliquid_wallet(wallet)
             dex = await resolve_dex(market)
             now_ms = int(time.time() * 1000)
             fills = await asyncio.to_thread(fetch_fills, wallet, now_ms - 30 * 24 * 60 * 60 * 1000)
             args = volume_card_args([f for f in fills if in_market(f, dex)], now_ms)
 
         await interaction.followup.send(
-            file=render_card(
+            file=await asyncio.to_thread(
+                render_card,
                 card.make_volume_card,
                 "volume.png",
                 "ENTROPY" if market == "entropy" else "",

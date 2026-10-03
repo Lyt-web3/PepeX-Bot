@@ -1,5 +1,3 @@
-import traceback
-
 import discord
 from discord import app_commands
 
@@ -17,6 +15,7 @@ class PepeBot(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
+        init_db()
         await self.tree.sync()
 
 
@@ -33,8 +32,9 @@ async def on_app_error(interaction: discord.Interaction, error: app_commands.App
     logger.exception("Discord command failed: %s", error)
 
     msg = "Something went wrong while building that card. Please try again in a moment."
-    if isinstance(error, PepexError):
-        msg = str(error)
+    original_error = getattr(error, "original", error)
+    if isinstance(original_error, PepexError):
+        msg = str(original_error)
 
     if interaction.response.is_done():
         await interaction.followup.send(msg, ephemeral=True)
@@ -81,7 +81,7 @@ async def pnl(interaction: discord.Interaction, wallet: str = None, coin: str = 
 
 @bot.tree.command(name="portfolio", description="Portfolio card for a wallet")
 @app_commands.describe(
-    wallet="Hyperliquid wallet address, or 'demo'",
+    wallet="Hyperliquid wallet address (or 'demo' for your linked wallet)",
     market="Hyperliquid (default) or Entropy",
 )
 @app_commands.choices(market=[
@@ -94,7 +94,7 @@ async def portfolio(interaction: discord.Interaction, wallet: str = None, market
 
 @bot.tree.command(name="volume", description="Trading volume card for a wallet")
 @app_commands.describe(
-    wallet="Hyperliquid wallet address, or 'demo'",
+    wallet="Hyperliquid wallet address",
     market="Hyperliquid (default) or Entropy",
 )
 @app_commands.choices(market=[
@@ -106,7 +106,6 @@ async def volume(interaction: discord.Interaction, wallet: str = None, market: s
 
 
 if __name__ == "__main__":
-    init_db()
     if not DISCORD_TOKEN:
         raise SystemExit("DISCORD_TOKEN not found. Check that your .env file is in this folder.")
     bot.run(DISCORD_TOKEN)

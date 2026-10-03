@@ -6,6 +6,10 @@ class WalletValidationError(PepexError):
     pass
 
 
+class WalletNotAssociatedError(PepexError):
+    pass
+
+
 class MarketValidationError(PepexError):
     pass
 
