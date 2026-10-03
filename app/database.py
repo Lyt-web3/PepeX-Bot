@@ -53,11 +53,12 @@ def get_linked_wallet(discord_id):
 
 def remove_linked_wallet(discord_id):
     with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
+        cursor = conn.execute(
             "DELETE FROM linked_wallets WHERE discord_id = ?",
             (discord_id,),
         )
         conn.commit()
+    return cursor.rowcount == 1
 
 
 def get_all_linked_wallets():

@@ -291,8 +291,9 @@ def get_linked_wallet(discord_id):
 
 def remove_linked_wallet(discord_id):
     with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("DELETE FROM linked_wallets WHERE discord_id=?", (discord_id,))
+        cursor = conn.execute("DELETE FROM linked_wallets WHERE discord_id=?", (discord_id,))
         conn.commit()
+    return cursor.rowcount == 1
 
 
 def get_all_linked_wallets():
@@ -528,10 +529,9 @@ async def mywallet(interaction: discord.Interaction):
 @bot.tree.command(name="unlink", description="Remove your linked wallet")
 async def unlink(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
-    if get_linked_wallet(interaction.user.id):
-        remove_linked_wallet(interaction.user.id)
+    if remove_linked_wallet(interaction.user.id):
         await interaction.followup.send(
-            "Your wallet has been unlinked.",
+            "Your wallet has been unlinked and its stored link data deleted. It will no longer appear in the leaderboard until linked again.",
             ephemeral=True
         )
     else:

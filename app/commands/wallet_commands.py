@@ -66,10 +66,9 @@ async def show_linked_wallet(interaction: discord.Interaction):
 
 
 async def unlink_wallet(interaction: discord.Interaction):
-    if get_linked_wallet(interaction.user.id):
-        remove_linked_wallet(interaction.user.id)
+    if remove_linked_wallet(interaction.user.id):
         await interaction.response.send_message(
-            "Your wallet has been unlinked.",
+            "Your wallet has been unlinked and its stored link data deleted. It will no longer appear in the leaderboard until linked again.",
             ephemeral=True,
         )
     else:

@@ -21,3 +21,4 @@ A Discord bot for generating Hyperliquid and Entropy trading cards.
 ## Notes
 
 This is a production-friendly layout for the current bot, separating command handling, services, rendering, and storage.
+Unlinking removes the wallet-to-Discord association from the database. Card images and trading-history data are not stored. Unlinked accounts are excluded from leaderboards until linked again.
