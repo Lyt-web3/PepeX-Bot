@@ -23,3 +23,5 @@ A Discord bot for generating Hyperliquid and Entropy trading cards.
 This is a production-friendly layout for the current bot, separating command handling, services, rendering, and storage.
 Wallets must be associated with Hyperliquid before they can be linked or used to generate cards. Unassociated addresses receive `THIS ADDRESS IS NOT ASSOCIATED WITH HYPERLIQUID`.
 Unlinking deletes the wallet-to-Discord association from the database. The bot does not persist card or trading-history data; an unlinked account is excluded from linked-wallet leaderboards until linked again.
+
+The repository root is the canonical bot project. Start one bot process with `python main.py` from this folder. `bot.py` and the nested `pepex-bot/main.py` and `pepex-bot/bot.py` are compatibility launchers that forward to the root bot.

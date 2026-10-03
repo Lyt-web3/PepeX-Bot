@@ -1,1 +1,0 @@
-"""PepeX application package."""
