@@ -4,7 +4,7 @@ from discord import app_commands
 from app.commands.card_commands import pnl_card, portfolio_card, volume_card
 from app.commands.leaderboard import LEADERBOARD_METRICS, leaderboard_command
 from app.commands.wallet_commands import link_wallet, show_linked_wallet, unlink_wallet
-from app.config import DISCORD_TOKEN, logger
+from app.config import DB_PATH, DISCORD_TOKEN, logger
 from app.database import init_db
 from app.exceptions import PepexError
 
@@ -24,7 +24,12 @@ bot = PepeBot()
 
 @bot.event
 async def on_ready():
-    logger.info("Logged in as %s", bot.user)
+    logger.info(
+        "Logged in as %s; bot_module=%s; wallet_database=%s",
+        bot.user,
+        __file__,
+        DB_PATH,
+    )
 
 
 @bot.tree.error
@@ -36,10 +41,15 @@ async def on_app_error(interaction: discord.Interaction, error: app_commands.App
     if isinstance(original_error, PepexError):
         msg = str(original_error)
 
-    if interaction.response.is_done():
-        await interaction.followup.send(msg, ephemeral=True)
-    else:
-        await interaction.response.send_message(msg, ephemeral=True)
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+    except discord.NotFound:
+        logger.warning("Could not send command error because the interaction expired")
+    except discord.HTTPException:
+        logger.exception("Could not send command error response")
 
 
 @bot.tree.command(name="link", description="Link a Hyperliquid wallet to your Discord account")
