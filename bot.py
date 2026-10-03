@@ -80,6 +80,13 @@ async def ask(payload):
     return await asyncio.to_thread(hl, payload)
 
 
+async def wallet_is_associated(wallet):
+    result = await ask({"type": "userRole", "user": wallet})
+    if not isinstance(result, dict) or not isinstance(result.get("role"), str):
+        raise ValueError(f"Unexpected Hyperliquid userRole response: {result!r}")
+    return result["role"].lower() != "missing"
+
+
 async def resolve_dex(market):
     """Hyperliquid's own markets use an empty dex name. Entropy is a HIP-3 dex, so we look up its name."""
     if market != "entropy":
@@ -266,6 +273,16 @@ def set_linked_wallet(discord_id, wallet):
         conn.commit()
 
 
+def create_linked_wallet(discord_id, wallet):
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO linked_wallets(discord_id, wallet) VALUES(?, ?)",
+            (discord_id, wallet),
+        )
+        conn.commit()
+    return cursor.rowcount == 1
+
+
 def get_linked_wallet(discord_id):
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute("SELECT wallet FROM linked_wallets WHERE discord_id=?", (discord_id,)).fetchone()
@@ -295,23 +312,49 @@ def money(value):
 async def check_wallet(interaction, wallet):
     if wallet is None:
         wallet = get_linked_wallet(interaction.user.id)
-        if wallet:
-            return wallet
+        if not wallet:
+            await interaction.followup.send(
+                "No wallet is linked to your Discord account. Use `/link wallet:<address>` first.",
+                ephemeral=True
+            )
+            return None
+
+    wallet = wallet.strip()
+    if wallet.lower() == "demo":
+        return wallet
+
+    if not is_wallet(wallet):
         await interaction.followup.send(
-            "No wallet is linked to your Discord account. Use `/link wallet:<address>` first.",
+            "That doesn't look like a wallet address. It should start with 0x and be 42 characters long.",
             ephemeral=True
         )
         return None
 
-    wallet = wallet.strip()
-    if wallet.lower() == "demo" or is_wallet(wallet):
-        return wallet
+    try:
+        associated = await wallet_is_associated(wallet)
+    except requests.exceptions.RequestException:
+        traceback.print_exc()
+        await interaction.followup.send(
+            "Hyperliquid is temporarily unavailable. Please try again in a moment.",
+            ephemeral=True
+        )
+        return None
+    except ValueError as exc:
+        print(f"Could not verify Hyperliquid wallet: {exc}")
+        await interaction.followup.send(
+            "Could not verify this wallet with Hyperliquid. Please try again in a moment.",
+            ephemeral=True
+        )
+        return None
 
-    await interaction.followup.send(
-        "That doesn't look like a wallet address. It should start with 0x and be 42 characters long.",
-        ephemeral=True
-    )
-    return None
+    if not associated:
+        await interaction.followup.send(
+            "THIS ADDRESS IS NOT ASSOCIATED WITH HYPERLIQUID",
+            ephemeral=True
+        )
+        return None
+
+    return wallet
 
 
 def entropy_wallet_stats(wallet, dex, now_ms):
@@ -411,7 +454,55 @@ async def link(interaction: discord.Interaction, wallet: str):
             ephemeral=True
         )
         return
-    set_linked_wallet(interaction.user.id, wallet)
+
+    if get_linked_wallet(interaction.user.id):
+        await interaction.followup.send(
+            "A wallet is already linked to this account. Use `/unlink` before linking another wallet.",
+            ephemeral=True,
+        )
+        return
+
+    try:
+        associated = await wallet_is_associated(wallet)
+    except requests.exceptions.RequestException:
+        traceback.print_exc()
+        await interaction.followup.send(
+            "Hyperliquid is temporarily unavailable. Please try linking again in a moment.",
+            ephemeral=True,
+        )
+        return
+    except ValueError as exc:
+        print(f"Could not verify Hyperliquid wallet: {exc}")
+        await interaction.followup.send(
+            "Could not verify this wallet with Hyperliquid. Please try again in a moment.",
+            ephemeral=True,
+        )
+        return
+
+    if not associated:
+        await interaction.followup.send(
+            "THIS ADDRESS IS NOT ASSOCIATED WITH HYPERLIQUID",
+            ephemeral=True,
+        )
+        return
+
+    try:
+        linked = create_linked_wallet(interaction.user.id, wallet)
+    except sqlite3.Error:
+        traceback.print_exc()
+        await interaction.followup.send(
+            "The wallet could not be saved. Please try again in a moment.",
+            ephemeral=True,
+        )
+        return
+
+    if not linked:
+        await interaction.followup.send(
+            "A wallet is already linked to this account. Use `/unlink` before linking another wallet.",
+            ephemeral=True,
+        )
+        return
+
     await interaction.followup.send(
         f"Wallet linked: `{short_wallet(wallet)}`",
         ephemeral=True
